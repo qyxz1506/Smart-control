@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SMART CONTROL MASTER</title>
+<style>
+body {
+  background: #101827;
+  color: white;
+  font-family: Arial;
+  text-align: center;
+  padding: 25px;
+}
+button {
+  padding: 13px;
+  margin: 8px;
+  border: none;
+  border-radius: 8px;
+  background: #1688ff;
+  color: white;
+}
+</style>
+</head>
+<body>
+
+<h1>SMART CONTROL</h1>
+<p>HP 2 - Panel utama</p>
+
+<button onclick="create()">Buat koneksi</button>
+<h2 id="code">------</h2>
+
+<p id="status">Belum terhubung</p>
+
+<button onclick="requestAccess()">Minta izin sesi</button>
+
+<h3>File diterima</h3>
+<div id="files"></div>
+
+<script>
+const SIGNAL = "wss://ALAMAT-SERVER-KAMU";
+let ws;
+let approved = false;
+
+function create() {
+  ws = new WebSocket(SIGNAL);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "create" }));
+  };
+
+  ws.onmessage = event => {
+    const msg = JSON.parse(event.data);
+
+    if (msg.type === "created") {
+      document.getElementById("code").textContent = msg.code;
+    }
+
+    if (msg.type === "target-connected") {
+      document.getElementById("status").textContent =
+        "Perangkat tujuan terhubung";
+    }
+
+    if (msg.type === "relay") {
+      if (msg.data.type === "approved") {
+        approved = true;
+        document.getElementById("status").textContent =
+          "Sesi disetujui";
+      }
+
+      if (msg.data.type === "rejected") {
+        approved = false;
+        document.getElementById("status").textContent =
+          "Sesi ditolak";
+      }
+
+      if (msg.data.type === "file") {
+        saveFile(msg.data);
+      }
+    }
+  };
+}
+
+function requestAccess() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+  ws.send(JSON.stringify({
+    type: "relay",
+    data: { type: "request" }
+  }));
+}
+
+function saveFile(file) {
+  if (!approved) return;
+
+  const bytes = new Uint8Array(file.data);
+  const blob = new Blob([bytes]);
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  a.href = url;
+  a.download = file.name;
+  a.textContent = "Unduh " + file.name;
+
+  document.getElementById("files").appendChild(a);
+  document.getElementById("files").appendChild(
+    document.createElement("br")
+  );
+}
+</script>
+
+</body>
+</html>
